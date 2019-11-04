@@ -40,4 +40,4 @@ add_executable(
 # - GMP
 # - Math
 # - Pcb
-target_link_libraries(2k-prs gmp m pbc)
+target_link_libraries(2k-prs gmp m)

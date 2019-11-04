@@ -8,15 +8,16 @@
 - `make`
 - `cmake`
 - `gmp`
-- `pbc`
+
 #### GNU Multi Precision
-`sudo apt install libgmp-dev`
+```shell script
+ sudo apt install libgmp-dev
+```
 
 #### PBC
 
 Downlaod `pbclib` from [here](https://crypto.stanford.edu/pbc/download.html)
 ```shell script
-
 sudo apt install flex nettle-dev bison byacc
 cd pbc-x.x.x
 ./configure
