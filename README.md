@@ -8,7 +8,7 @@
 - `make`
 - `cmake`
 - `gmp`
-
+- `pbc`
 #### GNU Multi Precision
 ```shell script
  sudo apt install libgmp-dev
@@ -52,5 +52,5 @@ cd build
 ## Clean
 
 ```shell script
-rm -rf build
+rm -rf build/
 ```

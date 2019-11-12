@@ -11,15 +11,15 @@ include_directories(src/include)
 add_executable(
         2k-prs-test
         # sources
-        src/tests/2k-prs.c
 
         # utils
         src/utils/lib-mesg.c
         src/utils/lib-timing.c
         src/utils/lib-misc.c
 
-        # project sources
-        src/lib/lib-2k-prs.c)
+        # lib sources
+        src/lib/lib-2k-prs.c
+        src/tests/2k-prs.c)
 
 # Main
 add_executable(
@@ -32,12 +32,13 @@ add_executable(
         src/utils/lib-timing.c
         src/utils/lib-misc.c
 
-        # project sources
+        # lib sources
         src/lib/lib-2k-prs.c)
 
 
 # Linking libraries
 # - GMP
 # - Math
-# - Pcb
-target_link_libraries(2k-prs gmp m)
+# - Pbc
+target_link_libraries(2k-prs gmp m pbc)
+target_link_libraries(2k-prs-test gmp m pbc)
