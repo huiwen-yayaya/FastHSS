@@ -40,10 +40,11 @@ void test_prs_gen_keys(prs_keys_t keys){
     gmp_printf ("n: %Zd\n", keys->n);
     gmp_printf ("y: %Zd\n", keys->y);
     gmp_printf ("k: %Zd\n", keys->k);
+    gmp_printf ("2^k: %Zd\n", keys->k_2);
 
     mpz_mod(mod, keys->p, keys->k_2);
     assert(mpz_get_ui(mod) == 1);
-    gmp_printf("p = %Zd mod 2^k\n", mod);
+    gmp_printf("p = %Zd mod 2^k ==> ok\n", mod);
     mpz_gcd(gcd_y_n, keys->y, keys->n);
     assert(mpz_cmp_ui(gcd_y_n, 1L) == 0);
     gmp_printf("gcd(y, n) = %Zd\n", mod);
@@ -130,6 +131,7 @@ int main(int argc, char *argv[]) {
 
 
     assert(mpz_cmp(plaintext->m, dec_plaintext->m) == 0);
+    printf("\n\nAll done!!");
     prs_plaintext_clear(plaintext);
     prs_plaintext_clear(dec_plaintext);
     prs_ciphertext_clear(ciphertext);

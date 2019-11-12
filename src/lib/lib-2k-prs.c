@@ -38,13 +38,16 @@ void prs_generate_keys(prs_keys_t keys, unsigned int k, unsigned int n_bits, gmp
 
     mpz_ui_pow_ui(p_min, 2L, k << 1);
     mpz_ui_pow_ui(p_max, 2L, k << 2);
-
     mpz_sub_ui(p_min, p_min, 1L);
     mpz_sub_ui(p_max, p_max, 1L);
 
+
     mpz_div(r_min, p_min, k_2);
     mpz_div(r_max, p_max, k_2);
+
+
     mpz_sub(limit, r_max, r_min);
+    mpz_add_ui(limit, limit, 1L);
 
     mpz_set_ui(prime, 2);
     mpz_set_ui(prod, 1);
@@ -60,13 +63,13 @@ void prs_generate_keys(prs_keys_t keys, unsigned int k, unsigned int n_bits, gmp
     // v0 = -((1/2^k) + r_min)
     mpz_set_ui(v0, 1L);
     mpz_div(v0, v0, k_2);
-    mpz_add(v0, v0, r_min);
-    mpz_mul_si(v0, v0, -1);
+    mpz_sub(v0, v0, r_min);
+
     mpz_mod(v0, v0, prod);
 
 
     //random v
-    mpz_urandomb(v, prng, k);
+    mpz_urandomm(v, prng, prod);
 
 
     //looking fo a prime p = 1 mod 2^k
@@ -77,14 +80,15 @@ void prs_generate_keys(prs_keys_t keys, unsigned int k, unsigned int n_bits, gmp
         mpz_mul(tmp3, tmp3, k_2);
         mpz_add_ui(keys->p, tmp3, 1);
         mpz_mul_ui(v, v, 2);
+        mpz_mod(v, v, prod);
 
     }while(mpz_sizeinbase(keys->p, 2) < p_bits || !mpz_probab_prime_p(keys->p, PRS_MR_ITERATIONS));
 
 
     /* pick random prime q*/
     do
-        mpz_urandomb(keys->q, prng, q_bits);
-    while (mpz_sizeinbase(keys->q, 2) < q_bits || !mpz_probab_prime_p(keys->q, PRS_MR_ITERATIONS));
+        mpz_urandomb(keys->q, prng, mpz_sizeinbase(keys->p, 2));
+    while (mpz_sizeinbase(keys->q, 2) < mpz_sizeinbase(keys->p, 2) || !mpz_probab_prime_p(keys->q, PRS_MR_ITERATIONS));
 
     /* n = p*q */
     mpz_mul(keys->n, keys->p, keys->q);
@@ -117,7 +121,6 @@ void prs_generate_keys(prs_keys_t keys, unsigned int k, unsigned int n_bits, gmp
 
         mpz_powm(y_p, keys->y, p_m_1_k, keys->p);
         mpz_powm(y_q, keys->y, q_m_1_k, keys->q);
-
     } while (
             // assert y < n ( y must be in in Zn )
             mpz_cmp(keys->y, keys->n) >=0 || mpz_cmp_ui(y_p, 1) == 0 || mpz_cmp_ui(y_q, 1) == 0);
