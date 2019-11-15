@@ -18,9 +18,9 @@ typedef enum { prs_public_key_type, prs_secret_key_type } prs_key_type_t;
 struct prs_keys_struct {
     prs_key_type_t type;
     unsigned int n_bits;
+    unsigned int k;
     mpz_t n;
     mpz_t y;
-    mpz_t k;
 
     mpz_t k_2;
     mpz_t p;

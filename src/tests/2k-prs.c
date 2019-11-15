@@ -39,7 +39,7 @@ void test_prs_gen_keys(prs_keys_t keys){
     gmp_printf ("q: %Zd\n", keys->q);
     gmp_printf ("n: %Zd\n", keys->n);
     gmp_printf ("y: %Zd\n", keys->y);
-    gmp_printf ("k: %Zd\n", keys->k);
+    printf ("k: %d\n", keys->k);
     gmp_printf ("2^k: %Zd\n", keys->k_2);
 
     mpz_mod(mod, keys->p, keys->k_2);
@@ -47,7 +47,7 @@ void test_prs_gen_keys(prs_keys_t keys){
     gmp_printf("p = %Zd mod 2^k ==> ok\n", mod);
     mpz_gcd(gcd_y_n, keys->y, keys->n);
     assert(mpz_cmp_ui(gcd_y_n, 1L) == 0);
-    gmp_printf("gcd(y, n) = %Zd\n", mod);
+    gmp_printf("gcd(y, n) = %Zd ==> ok\n", mod);
 
     printf("Test passed!\n\n");
 
@@ -115,8 +115,8 @@ int main(int argc, char *argv[]) {
     // test enc
     // genarting random msg
     do {
-        mpz_urandomb(plaintext->m, prng, DEFAULT_MOD_BITS / 4);
-    } while (mpz_sizeinbase(plaintext->m, 2) < (DEFAULT_MOD_BITS / 4));
+        mpz_urandomb(plaintext->m, prng, keys->k);
+    } while (mpz_sizeinbase(plaintext->m, 2) < keys->k);
 
     // prs_encrypt
     test_prs_enc(ciphertext, keys, plaintext);
@@ -129,9 +129,8 @@ int main(int argc, char *argv[]) {
     gmp_printf("m1: %Zd\n\n", plaintext->m);
     gmp_printf("m2: %Zd\n\n", dec_plaintext->m);
 
-
     assert(mpz_cmp(plaintext->m, dec_plaintext->m) == 0);
-    printf("\n\nAll done!!");
+    printf("All done!!\n");
     prs_plaintext_clear(plaintext);
     prs_plaintext_clear(dec_plaintext);
     prs_ciphertext_clear(ciphertext);
