@@ -15,8 +15,8 @@
  */
 void prs_generate_keys(prs_keys_t keys, unsigned int k, unsigned int n_bits, gmp_randstate_t prng){
 
-    mpz_t tmp;
-    unsigned int p_bits, q_bits;
+    mpz_t tmp, p_m_1, p_m_1_k, d;
+    unsigned int p_bits, q_bits, i;
 
     //pmesg(msg_verbose, "keys generation");
 
@@ -28,7 +28,7 @@ void prs_generate_keys(prs_keys_t keys, unsigned int k, unsigned int n_bits, gmp
     keys->n_bits = n_bits;
 
     mpz_inits(keys->p, keys->q, keys->y, keys->n, keys->k_2, NULL);
-    mpz_init(tmp);
+    mpz_inits(tmp, p_m_1, p_m_1_k, d, NULL);
 
     keys->k = k;
     // 2^k
@@ -72,7 +72,19 @@ void prs_generate_keys(prs_keys_t keys, unsigned int k, unsigned int n_bits, gmp
         }
     } while (mpz_jacobi(keys->y, keys->p) != -1 ||  mpz_jacobi(keys->y, keys->q) != -1);
 
-    mpz_clear(tmp);
+    mpz_sub_ui(p_m_1, keys->p, 1L);
+    mpz_div_2exp(p_m_1_k, p_m_1, keys->k);
+    mpz_powm(d, keys->y, p_m_1_k, keys->p);
+    mpz_invert(d, d, keys->p);
+
+    keys->d = malloc(sizeof (mpz_t) * (k -1));
+    mpz_init(keys->d[0]);
+    mpz_set(keys->d[0], d);
+    for(i = 1; i < keys->k -1; i++){
+        mpz_init(keys->d[i]);
+        mpz_powm_ui(keys->d[i], keys->d[i-1], 2L, keys->p);
+    }
+    mpz_clears(tmp, p_m_1, p_m_1_k, d, NULL);
 
 }
 /**
@@ -152,33 +164,26 @@ void prs_encrypt(prs_ciphertext_t ciphertext, prs_keys_t keys, prs_plaintext_t p
  */
 void prs_decrypt(prs_plaintext_t plaintext, prs_keys_t keys, prs_ciphertext_t ciphertext){
     int i=0;
-    mpz_t m, c, b, d, z, p_m_1, p_m_1_k, k_j;
-    mpz_inits(m, c, b, d, z, p_m_1, p_m_1_k, k_j, NULL);
+    mpz_t m, c, b, z, p_m_1, p_m_1_k, k_j;
+    mpz_inits(m, c, b, z, p_m_1, p_m_1_k, k_j, NULL);
     mpz_set_ui(m, 0);
     mpz_set_ui(b, 1L);
-
     mpz_sub_ui(p_m_1, keys->p, 1L);
-
     mpz_div_2exp(p_m_1_k, p_m_1, keys->k);
-
-    mpz_powm(d, keys->y, p_m_1_k, keys->p);
-    mpz_invert(d, d, keys->p);
-
     mpz_powm(c, ciphertext->c, p_m_1_k, keys->p);
-    for(i = 1; i <= keys->k; i++){
+    for(i = 1; i < keys->k; i++){
         mpz_ui_pow_ui(k_j, 2L, keys->k - i);
         mpz_powm(z, c, k_j, keys->p);
         if(mpz_cmp_ui(z, 1) != 0){
             mpz_add(m, m, b);
-            mpz_mul(c, c, d);
+            mpz_mul(c, c, keys->d[i - 1]);
             mpz_mod(c, c, keys->p);
         }
         mpz_mul_2exp(b, b, 1);
-        mpz_powm_ui(d, d, 2L, keys->p);
     }
     if(mpz_cmp_ui(c, 1L) != 0){
         mpz_add(m, m, b);
     }
     mpz_set(plaintext->m, m);
-    mpz_clears(m, c, b, d, z, p_m_1, p_m_1_k, k_j, NULL);
+    mpz_clears(m, c, b, z, p_m_1, p_m_1_k, k_j, NULL);
 }

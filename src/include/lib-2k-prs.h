@@ -25,6 +25,7 @@ struct prs_keys_struct {
     mpz_t k_2;
     mpz_t p;
     mpz_t q;
+    mpz_t *d;
 };
 typedef struct prs_keys_struct prs_keys_t[1];
 struct prs_plaintext_struct {
