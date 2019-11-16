@@ -15,11 +15,10 @@
  */
 void prs_generate_keys(prs_keys_t keys, unsigned int k, unsigned int n_bits, gmp_randstate_t prng){
 
-    mpz_t k_2, tmp1, p_m_1, q_m_1, p_m_1_k, q_m_1_k, r_min, r_max, p_min, p_max, prime, prod, limit, tmp3, v0, v, y_p, y_q;
+    mpz_t tmp;
     unsigned int p_bits, q_bits;
 
     //pmesg(msg_verbose, "keys generation");
-
 
     assert(keys);
     assert(n_bits > 1);
@@ -29,58 +28,16 @@ void prs_generate_keys(prs_keys_t keys, unsigned int k, unsigned int n_bits, gmp
     keys->n_bits = n_bits;
 
     mpz_inits(keys->p, keys->q, keys->y, keys->n, keys->k_2, NULL);
-    mpz_inits(k_2, r_min, r_max, tmp1, tmp3, p_m_1, q_m_1, p_m_1_k, q_m_1_k, y_p, y_q, p_min, p_max, prime, prod, limit, v0, v, NULL);
+    mpz_init(tmp);
 
-    // 2^k
     keys->k = k;
-    mpz_ui_pow_ui(k_2, 2L, k);
-    mpz_set(keys->k_2, k_2);
+    // 2^k
+    mpz_ui_pow_ui(keys->k_2, 2L, k);
 
-    mpz_ui_pow_ui(p_min, 2L, k << 1);
-    mpz_ui_pow_ui(p_max, 2L, k << 2);
-    //mpz_sub_ui(p_min, p_min, 1L);
-    //mpz_sub_ui(p_max, p_max, 1L);
-
-
-    mpz_div_2exp(r_min, p_min, keys->k);
-    mpz_div_2exp(r_max, p_max, keys->k);
-
-    mpz_sub(limit, r_max, r_min);
-    mpz_add_ui(limit, limit, 1L);
-
-    mpz_set_ui(prime, 2);
-    mpz_set_ui(prod, 1);
-    do{
-        mpz_nextprime(prime, prime);
-        mpz_mul(prod, prod, prime);
-    } while(mpz_cmp(prod, limit) < 0);
-
-    if(mpz_cmp(prod, limit)>0){
-       mpz_div(prod, prod, prime);
-    }
-
-    // v0 = -((1/2^k) + r_min)
-    mpz_set_ui(v0, 1L);
-    mpz_div_2exp(v0, v0, keys->k);
-    mpz_sub(v0, v0, r_min);
-
-    mpz_mod(v0, v0, prod);
-
-
-    //random v
-    mpz_urandomm(v, prng, prod);
-
-
-    //looking fo a prime p = 1 mod 2^k
-    do{
-        mpz_add(tmp3, v0, v);
-        mpz_mod(tmp3, tmp3, prod);
-        mpz_add(tmp3, tmp3, r_min);
-        mpz_mul(tmp3, tmp3, k_2);
-        mpz_add_ui(keys->p, tmp3, 1);
-        mpz_mul_ui(v, v, 2);
-        mpz_mod(v, v, prod);
-
+    do {
+        mpz_urandomb(keys->p, prng, p_bits - k);
+        mpz_mul_2exp(keys->p, keys->p, k);
+        mpz_setbit(keys->p, 0L);
     }while(mpz_sizeinbase(keys->p, 2) < p_bits || !mpz_probab_prime_p(keys->p, PRS_MR_ITERATIONS));
 
     q_bits = mpz_sizeinbase(keys->p, 2);
@@ -92,13 +49,6 @@ void prs_generate_keys(prs_keys_t keys, unsigned int k, unsigned int n_bits, gmp
     /* n = p*q */
     mpz_mul(keys->n, keys->p, keys->q);
 
-
-    /* (p - 1)/k ; (q -1)/k */
-    mpz_sub_ui(p_m_1, keys->p, 1);
-    mpz_div_ui(p_m_1_k, p_m_1, keys->k);
-
-    mpz_sub_ui(q_m_1, keys->q, 1);
-    mpz_div_ui(q_m_1_k, q_m_1, keys->k);
     /**
      * J = { a € Zn: J(a/n) = 1 }
      * J(a/n) = J(a/p) * J(a/q) if n == p*q
@@ -113,13 +63,13 @@ void prs_generate_keys(prs_keys_t keys, unsigned int k, unsigned int n_bits, gmp
 
     do {
         mpz_urandomb(keys->y, prng, n_bits);
-        mpz_gcd(tmp1, keys->y, keys->n);
-        if(mpz_cmp_ui(tmp1, 1L) != 0){
+        mpz_gcd(tmp, keys->y, keys->n);
+        if(mpz_cmp_ui(tmp, 1L) != 0){
             continue;
         }
     } while (mpz_jacobi(keys->y, keys->p) != -1 ||  mpz_jacobi(keys->y, keys->q) != -1);
 
-    mpz_clears(k_2, tmp1, p_m_1, q_m_1, p_m_1_k, q_m_1_k, r_min, r_max, p_min, p_max, prime, prod, limit, tmp3, v0, v, y_p, y_q,  NULL);
+    mpz_clear(tmp);
 
 }
 /**
