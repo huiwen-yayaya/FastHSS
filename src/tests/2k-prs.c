@@ -20,8 +20,8 @@ gmp_randstate_t prng;
 void test_prs_gen_keys(prs_keys_t keys){
 
     elapsed_time_t time;
-    mpz_t gcd_y_n, mod;
-    mpz_inits(gcd_y_n, mod, NULL);
+    mpz_t gcd, mod;
+    mpz_inits(gcd, mod, NULL);
     long k = DEFAULT_MOD_BITS / 4; /* default: max message size 1024 bit */
     printf("Starting prs_generate_keys\n");
 
@@ -45,13 +45,16 @@ void test_prs_gen_keys(prs_keys_t keys){
     mpz_mod(mod, keys->p, keys->k_2);
     assert(mpz_get_ui(mod) == 1);
     gmp_printf("p = %Zd mod 2^k ==> ok\n", mod);
-    mpz_gcd(gcd_y_n, keys->y, keys->n);
-    assert(mpz_cmp_ui(gcd_y_n, 1L) == 0);
+    mpz_gcd(gcd, keys->y, keys->n);
+    assert(mpz_cmp_ui(gcd, 1L) == 0);
     gmp_printf("gcd(y, n) = %Zd ==> ok\n", mod);
+    mpz_mod_ui(mod, keys->q, 4);
+    assert(mpz_cmp_ui(mod, 3L) == 0);
+    gmp_printf("q = %Zd mod 4 ==> ok\n", mod);
 
     printf("Test passed!\n\n");
 
-    mpz_clears(gcd_y_n, mod, NULL);
+    mpz_clears(gcd, mod, NULL);
 
 }
 /**

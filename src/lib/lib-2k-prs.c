@@ -42,9 +42,12 @@ void prs_generate_keys(prs_keys_t keys, unsigned int k, unsigned int n_bits, gmp
 
     q_bits = mpz_sizeinbase(keys->p, 2);
     /* pick random prime q*/
-    do
-        mpz_urandomb(keys->q, prng, mpz_sizeinbase(keys->p, 2));
-    while (mpz_sizeinbase(keys->q, 2) < q_bits  || !mpz_probab_prime_p(keys->q, PRS_MR_ITERATIONS));
+    do {
+        mpz_urandomb(keys->q, prng, p_bits - 2);
+        mpz_mul_2exp(keys->q, keys->q, 2);
+        mpz_setbit(keys->q, 0L);
+        mpz_setbit(keys->q, 1L);
+    }while (mpz_sizeinbase(keys->q, 2) < q_bits  || !mpz_probab_prime_p(keys->q, PRS_MR_ITERATIONS));
 
     /* n = p*q */
     mpz_mul(keys->n, keys->p, keys->q);
