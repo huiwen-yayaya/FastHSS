@@ -14,22 +14,131 @@
 
 #define prng_sec_level 128
 #define DEFAULT_MOD_BITS 4096
-
+#define BENCHMARK_ITERATIONS 10
 gmp_randstate_t prng;
 
-void test_prs_gen_keys(prs_keys_t keys){
+void run_benchmark(){
+    int i;
+    long k = DEFAULT_MOD_BITS / 4;
+    prs_keys_t keys;
+    prs_ciphertext_t ciphertext;
+    prs_plaintext_t plaintext, dec_plaintext;
+    elapsed_time_t time, v1_keys=0, v2_keys=0, enc=0, v1_dec=0, v2_dec=0;
+    // generate_keys_v1
+    printf("Starting benchmark\n");
+    printf("Running prs_generate_keys_v1 %d times\n", BENCHMARK_ITERATIONS);
+    for(i=0; i < BENCHMARK_ITERATIONS; i++){
+        perform_oneshot_clock_cycles_sampling(time, tu_millis, {
+            prs_generate_keys_v1(keys, k, DEFAULT_MOD_BITS, prng);
+        });
+        v1_keys+=time;
+    }
+    printf_et("prs_generate_keys_v1 - time elapsed: ", v1_keys / BENCHMARK_ITERATIONS, tu_millis, "\n");
 
-    elapsed_time_t time;
+    printf("Running prs_generate_keys_v2 %d times\n", BENCHMARK_ITERATIONS);
+    //generate_keys_v2
+    for(i=0; i < BENCHMARK_ITERATIONS; i++){
+        perform_oneshot_clock_cycles_sampling(time, tu_millis, {
+            prs_generate_keys_v2(keys, k, DEFAULT_MOD_BITS, prng);
+        });
+        v2_keys+=time;
+    }
+    printf_et("prs_generate_keys_v2 - time elapsed: ", v2_keys / BENCHMARK_ITERATIONS, tu_millis, "\n");
+
+
+    // generating random message
+    prs_plaintext_init(plaintext);
+    prs_plaintext_init(dec_plaintext);
+    prs_ciphertext_init(ciphertext);
+    mpz_urandomb(plaintext->m, prng, keys->k);
+
+    //prs_enc
+    printf("Running prs_encrypt %d times\n", BENCHMARK_ITERATIONS);
+    for(i=0; i < BENCHMARK_ITERATIONS; i++){
+        perform_oneshot_clock_cycles_sampling(time, tu_millis, {
+            prs_encrypt(ciphertext, keys, plaintext, prng);
+        });
+        enc+=time;
+    }
+    printf_et("prs_encrypt - time elapsed: ", enc / BENCHMARK_ITERATIONS, tu_millis, "\n");
+
+
+
+    //decrypt_v1
+    printf("Running prs_decrypt_v1 %d times\n", BENCHMARK_ITERATIONS);
+    for(i=0; i < BENCHMARK_ITERATIONS; i++){
+        perform_oneshot_clock_cycles_sampling(time, tu_millis, {
+            prs_decrypt_v1(dec_plaintext, keys, ciphertext);
+        });
+        v1_dec+=time;
+    }
+    printf_et("prs_decrypt_v1 - time elapsed: ", v1_dec / BENCHMARK_ITERATIONS, tu_millis, "\n");
+
+
+    //decrypt_v2
+    printf("Running prs_decrypt_v2 %d times\n", BENCHMARK_ITERATIONS);
+    for(i=0; i < BENCHMARK_ITERATIONS; i++){
+        perform_oneshot_clock_cycles_sampling(time, tu_millis, {
+            prs_decrypt_v2(dec_plaintext, keys, ciphertext);
+        });
+        v2_dec+=time;
+    }
+    printf_et("prs_decrypt_v2 - time elapsed: ", v2_dec / BENCHMARK_ITERATIONS, tu_millis, "\n");
+
+    printf(" -------------------------------------------------------------------------------\n");
+    printf("|Gen Keys V1 \t\t| Gen Keys V2 \t\t| Enc \t\t| Dec V1 \t\t| Dec V2\t|\n");
+    printf("!-------------------------------------------------------------------------------|\n");
+    printf_et("| ", v1_keys / BENCHMARK_ITERATIONS, tu_millis, "\t|");
+    printf_et("", v2_keys / BENCHMARK_ITERATIONS, tu_millis, "\t|");
+    printf_et("", enc / BENCHMARK_ITERATIONS, tu_millis, "\t|");
+    printf_et("", v1_dec / BENCHMARK_ITERATIONS, tu_millis, "\t|");
+    printf_et("", v2_dec / BENCHMARK_ITERATIONS, tu_millis, "\t|\n");
+    printf(" -------------------------------------------------------------------------------\n");
+
+    prs_plaintext_clear(plaintext);
+    prs_plaintext_clear(dec_plaintext);
+    prs_ciphertext_clear(ciphertext);
+}
+void test_prs_gen_keys_v1(prs_keys_t keys){
     mpz_t gcd, mod;
     mpz_inits(gcd, mod, NULL);
     long k = DEFAULT_MOD_BITS / 4; /* default: max message size 1024 bit */
-    printf("Starting prs_generate_keys\n");
+    printf("Starting test: prs_generate_keys_v1\n");
 
-    perform_oneshot_clock_cycles_sampling(time, tu_millis, {
-        prs_generate_keys(keys, k, DEFAULT_MOD_BITS, prng);
-    });
+    prs_generate_keys_v1(keys, k, DEFAULT_MOD_BITS, prng);
 
-    printf_et("prs_generate_keys - time elapsed: ", time, tu_millis, "\n");
+
+    assert(mpz_sizeinbase(keys->p, 2) >= (DEFAULT_MOD_BITS >> 1));
+    assert(mpz_sizeinbase(keys->q, 2) >= DEFAULT_MOD_BITS - (DEFAULT_MOD_BITS >> 1));
+    assert(mpz_probab_prime_p(keys->p, PRS_MR_ITERATIONS));
+    assert(mpz_probab_prime_p(keys->q, PRS_MR_ITERATIONS));
+    gmp_printf ("p: %Zd\n", keys->p);
+    gmp_printf ("q: %Zd\n", keys->q);
+    gmp_printf ("n: %Zd\n", keys->n);
+    gmp_printf ("y: %Zd\n", keys->y);
+    printf ("k: %d\n", keys->k);
+    gmp_printf ("2^k: %Zd\n", keys->k_2);
+
+    mpz_mod(mod, keys->p, keys->k_2);
+    assert(mpz_get_ui(mod) == 1);
+    gmp_printf("p = %Zd mod 2^k ==> ok\n", mod);
+    mpz_gcd(gcd, keys->y, keys->n);
+    assert(mpz_cmp_ui(gcd, 1L) == 0);
+    gmp_printf("gcd(y, n) = %Zd ==> ok\n", mod);
+
+    printf("Test passed!\n\n");
+
+    mpz_clears(gcd, mod, NULL);
+
+}
+void test_prs_gen_keys_v2(prs_keys_t keys){
+    mpz_t gcd, mod;
+    mpz_inits(gcd, mod, NULL);
+    long k = DEFAULT_MOD_BITS / 4; /* default: max message size 1024 bit */
+    printf("Starting test prs_generate_keys_v2\n");
+
+    prs_generate_keys_v2(keys, k, DEFAULT_MOD_BITS, prng);
+
 
     assert(mpz_sizeinbase(keys->p, 2) >= (DEFAULT_MOD_BITS >> 1));
     assert(mpz_sizeinbase(keys->q, 2) >= DEFAULT_MOD_BITS - (DEFAULT_MOD_BITS >> 1));
@@ -80,11 +189,20 @@ void test_prs_enc(prs_ciphertext_t ciphertext, prs_keys_t keys, prs_plaintext_t 
  * @param keys prs keys
  * @param ciphertext chipertext to decrypt
  */
-void test_prs_dec(prs_plaintext_t plaintext, prs_keys_t keys, prs_ciphertext_t ciphertext){
+void test_prs_dec_v1(prs_plaintext_t plaintext, prs_keys_t keys, prs_ciphertext_t ciphertext){
     elapsed_time_t time;
-    printf("Starting prs_decrypt\n");
+    printf("Starting test: prs_decrypt_v1\n");
     perform_oneshot_clock_cycles_sampling(time, tu_millis, {
-        prs_decrypt(plaintext, keys, ciphertext);
+        prs_decrypt_v1(plaintext, keys, ciphertext);
+    });
+    printf_et("prs_decrypt - time elapsed: ", time, tu_millis, "\n");
+
+}
+void test_prs_dec_v2(prs_plaintext_t plaintext, prs_keys_t keys, prs_ciphertext_t ciphertext){
+    elapsed_time_t time;
+    printf("Starting test prs_decrypt_v2\n");
+    perform_oneshot_clock_cycles_sampling(time, tu_millis, {
+        prs_decrypt_v2(plaintext, keys, ciphertext);
     });
     printf_et("prs_decrypt - time elapsed: ", time, tu_millis, "\n");
 
@@ -97,13 +215,15 @@ int main(int argc, char *argv[]) {
 
     set_messaging_level(msg_very_verbose);
 
-    prs_keys_t keys;
-    prs_plaintext_t plaintext, dec_plaintext;
+    prs_keys_t keys_v1, keys_v2;
+    prs_plaintext_t plaintext, dec_plaintext_v1, dec_plaintext_v2;
     prs_plaintext_init(plaintext);
-    prs_plaintext_init(dec_plaintext);
+    prs_plaintext_init(dec_plaintext_v1);
+    prs_plaintext_init(dec_plaintext_v2);
 
-    prs_ciphertext_t ciphertext;
-    prs_ciphertext_init(ciphertext);
+    prs_ciphertext_t ciphertext_v1, ciphertext_v2;
+    prs_ciphertext_init(ciphertext_v1);
+    prs_ciphertext_init(ciphertext_v2);
 
     printf("Launching tests with k=%d, n_bits=%d\n\n", DEFAULT_MOD_BITS / 4, DEFAULT_MOD_BITS);
     printf("Calibrating timing tools...\n\n");
@@ -111,32 +231,45 @@ int main(int argc, char *argv[]) {
     detect_clock_cycles_overhead();
     detect_timestamp_overhead();
 
+    //benchmark
+    run_benchmark();
+
     // test
     // prs_generate_keys
-    test_prs_gen_keys(keys);
+    test_prs_gen_keys_v1(keys_v1);
+    test_prs_gen_keys_v2(keys_v2);
 
     // test enc
     // genarting random msg
     do {
-        mpz_urandomb(plaintext->m, prng, keys->k);
-    } while (mpz_sizeinbase(plaintext->m, 2) < keys->k);
+        mpz_urandomb(plaintext->m, prng, keys_v1->k);
+    } while (mpz_sizeinbase(plaintext->m, 2) < keys_v1->k);
 
     // prs_encrypt
-    test_prs_enc(ciphertext, keys, plaintext);
+    test_prs_enc(ciphertext_v1, keys_v1, plaintext);
+    test_prs_enc(ciphertext_v2, keys_v2, plaintext);
 
     // test decrypt
-    gmp_printf("c: %Zd\n\n", ciphertext->c);
+    gmp_printf("c_v1: %Zd\n\n", ciphertext_v1->c);
+    gmp_printf("c_v2: %Zd\n\n", ciphertext_v2->c);
 
-    test_prs_dec(dec_plaintext, keys, ciphertext);
+    test_prs_dec_v1(dec_plaintext_v1, keys_v1, ciphertext_v1);
+    gmp_printf("m1_v1: %Zd\n\n", plaintext->m);
+    gmp_printf("m2_v2: %Zd\n\n", dec_plaintext_v1->m);
+    assert(mpz_cmp(plaintext->m, dec_plaintext_v1->m) == 0);
 
-    gmp_printf("m1: %Zd\n\n", plaintext->m);
-    gmp_printf("m2: %Zd\n\n", dec_plaintext->m);
+    test_prs_dec_v2(dec_plaintext_v2, keys_v2, ciphertext_v2);
+    gmp_printf("m1_v2: %Zd\n\n", plaintext->m);
+    gmp_printf("m2_v2: %Zd\n\n", dec_plaintext_v2->m);
+    assert(mpz_cmp(plaintext->m, dec_plaintext_v2->m) == 0);
 
-    assert(mpz_cmp(plaintext->m, dec_plaintext->m) == 0);
+
     printf("All done!!\n");
     prs_plaintext_clear(plaintext);
-    prs_plaintext_clear(dec_plaintext);
-    prs_ciphertext_clear(ciphertext);
+    prs_plaintext_clear(dec_plaintext_v1);
+    prs_plaintext_clear(dec_plaintext_v2);
+    prs_ciphertext_clear(ciphertext_v1);
+    prs_ciphertext_clear(ciphertext_v2);
     gmp_randclear(prng);
 
     return 0;
