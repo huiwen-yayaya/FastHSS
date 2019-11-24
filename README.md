@@ -70,6 +70,7 @@ rm -rf build/
 
 
 ![](benchmarks/Gen_Keys.png)
+
 K = 96
 ```
 keys v1: 2.123119 ms (±0.853288 ms)
