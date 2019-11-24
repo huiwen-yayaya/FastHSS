@@ -15,86 +15,79 @@
 #define prng_sec_level 128
 #define DEFAULT_MOD_BITS 4096
 #define BENCHMARK_ITERATIONS 10
+
+#define sampling_time 4 /* secondi */
+#define max_samples (sampling_time * 50)
+
 gmp_randstate_t prng;
 
 void run_benchmark(){
-    int i;
-    long k = DEFAULT_MOD_BITS / 4;
+    set_messaging_level(msg_verbose);
+    int i, k;
+    int k_len [] = { 96, 112, 128, 256, 512, 1024 };
     prs_keys_t keys;
     prs_ciphertext_t ciphertext;
     prs_plaintext_t plaintext, dec_plaintext;
     elapsed_time_t time, v1_keys=0, v2_keys=0, enc=0, v1_dec=0, v2_dec=0;
     // generate_keys_v1
+
+    stats_t timing_keys1, timing_keys2, timing_enc, timing_dec1, timing_dec2;
     printf("Starting benchmark\n");
-    printf("Running prs_generate_keys_v1 %d times\n", BENCHMARK_ITERATIONS);
-    for(i=0; i < BENCHMARK_ITERATIONS; i++){
-        perform_oneshot_clock_cycles_sampling(time, tu_millis, {
-            prs_generate_keys_v1(keys, k, DEFAULT_MOD_BITS, prng);
-        });
-        v1_keys+=time;
+
+
+    for(k = 0; k < 6; k++) {
+        printf("K = %d\n", k_len[k]);
+        perform_timestamp_sampling_period(
+                timing_keys1, sampling_time, max_samples, tu_millis,
+                {
+                    prs_generate_keys_v1(keys, k_len[k], k_len[k] * 4, prng);
+                },
+                {});
+        pmesg_stats(msg_verbose, "keys v1", timing_keys1);
+
+        //generate_keys_v2
+        perform_timestamp_sampling_period(
+                timing_keys2, sampling_time, max_samples, tu_millis,
+                {
+                    prs_generate_keys_v2(keys, k_len[k], k_len[k] * 4, prng);
+                },
+                {});
+        pmesg_stats(msg_verbose, "keys v2", timing_keys2);
+
+        // generating random message
+        prs_plaintext_init(plaintext);
+        prs_plaintext_init(dec_plaintext);
+        prs_ciphertext_init(ciphertext);
+        mpz_urandomb(plaintext->m, prng, keys->k);
+
+        //prs_enc
+        perform_timestamp_sampling_period(
+                timing_enc, sampling_time, max_samples, tu_millis,
+                {
+                    prs_encrypt(ciphertext, keys, plaintext, prng);
+                },
+                {});
+        pmesg_stats(msg_verbose, "enc", timing_enc);
+
+
+        //decrypt_v1
+        perform_timestamp_sampling_period(
+                timing_dec1, sampling_time, max_samples, tu_millis,
+                {
+                    prs_decrypt_v1(dec_plaintext, keys, ciphertext);
+                },
+                {});
+        pmesg_stats(msg_verbose, "dec1", timing_dec1);
+
+        //decrypt_v2
+        perform_timestamp_sampling_period(
+                timing_dec2, sampling_time, max_samples, tu_millis,
+                {
+                    prs_decrypt_v2(dec_plaintext, keys, ciphertext);
+                },
+                {});
+        pmesg_stats(msg_verbose, "dec2", timing_dec2);
     }
-    printf_et("prs_generate_keys_v1 - time elapsed: ", v1_keys / BENCHMARK_ITERATIONS, tu_millis, "\n");
-
-    printf("Running prs_generate_keys_v2 %d times\n", BENCHMARK_ITERATIONS);
-    //generate_keys_v2
-    for(i=0; i < BENCHMARK_ITERATIONS; i++){
-        perform_oneshot_clock_cycles_sampling(time, tu_millis, {
-            prs_generate_keys_v2(keys, k, DEFAULT_MOD_BITS, prng);
-        });
-        v2_keys+=time;
-    }
-    printf_et("prs_generate_keys_v2 - time elapsed: ", v2_keys / BENCHMARK_ITERATIONS, tu_millis, "\n");
-
-
-    // generating random message
-    prs_plaintext_init(plaintext);
-    prs_plaintext_init(dec_plaintext);
-    prs_ciphertext_init(ciphertext);
-    mpz_urandomb(plaintext->m, prng, keys->k);
-
-    //prs_enc
-    printf("Running prs_encrypt %d times\n", BENCHMARK_ITERATIONS);
-    for(i=0; i < BENCHMARK_ITERATIONS; i++){
-        perform_oneshot_clock_cycles_sampling(time, tu_millis, {
-            prs_encrypt(ciphertext, keys, plaintext, prng);
-        });
-        enc+=time;
-    }
-    printf_et("prs_encrypt - time elapsed: ", enc / BENCHMARK_ITERATIONS, tu_millis, "\n");
-
-
-
-    //decrypt_v1
-    printf("Running prs_decrypt_v1 %d times\n", BENCHMARK_ITERATIONS);
-    for(i=0; i < BENCHMARK_ITERATIONS; i++){
-        perform_oneshot_clock_cycles_sampling(time, tu_millis, {
-            prs_decrypt_v1(dec_plaintext, keys, ciphertext);
-        });
-        v1_dec+=time;
-    }
-    printf_et("prs_decrypt_v1 - time elapsed: ", v1_dec / BENCHMARK_ITERATIONS, tu_millis, "\n");
-
-
-    //decrypt_v2
-    printf("Running prs_decrypt_v2 %d times\n", BENCHMARK_ITERATIONS);
-    for(i=0; i < BENCHMARK_ITERATIONS; i++){
-        perform_oneshot_clock_cycles_sampling(time, tu_millis, {
-            prs_decrypt_v2(dec_plaintext, keys, ciphertext);
-        });
-        v2_dec+=time;
-    }
-    printf_et("prs_decrypt_v2 - time elapsed: ", v2_dec / BENCHMARK_ITERATIONS, tu_millis, "\n");
-
-    printf(" -------------------------------------------------------------------------------\n");
-    printf("|Gen Keys V1 \t\t| Gen Keys V2 \t\t| Enc \t\t| Dec V1 \t\t| Dec V2\t|\n");
-    printf("!-------------------------------------------------------------------------------|\n");
-    printf_et("| ", v1_keys / BENCHMARK_ITERATIONS, tu_millis, "\t|");
-    printf_et("", v2_keys / BENCHMARK_ITERATIONS, tu_millis, "\t|");
-    printf_et("", enc / BENCHMARK_ITERATIONS, tu_millis, "\t|");
-    printf_et("", v1_dec / BENCHMARK_ITERATIONS, tu_millis, "\t|");
-    printf_et("", v2_dec / BENCHMARK_ITERATIONS, tu_millis, "\t|\n");
-    printf(" -------------------------------------------------------------------------------\n");
-
     prs_plaintext_clear(plaintext);
     prs_plaintext_clear(dec_plaintext);
     prs_ciphertext_clear(ciphertext);

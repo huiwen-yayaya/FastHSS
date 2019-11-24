@@ -76,6 +76,7 @@ void prs_generate_keys_v1(prs_keys_t keys, unsigned int k, unsigned int n_bits, 
     mpz_ui_pow_ui(p_max, 2L, k << 2);
     //mpz_sub_ui(p_min, p_min, 1L);
     //mpz_sub_ui(p_max, p_max, 1L);
+    //gmp_printf("p_min = %Zd\n, p_max = %Zd", p_min, p_max);
 
 
     mpz_div_2exp(r_min, p_min, keys->k);
@@ -122,7 +123,7 @@ void prs_generate_keys_v1(prs_keys_t keys, unsigned int k, unsigned int n_bits, 
     q_bits = mpz_sizeinbase(keys->p, 2);
     /* pick random prime q*/
     do
-        mpz_urandomb(keys->q, prng, mpz_sizeinbase(keys->p, 2));
+        mpz_urandomb(keys->q, prng, q_bits);
     while (mpz_sizeinbase(keys->q, 2) < q_bits  || !mpz_probab_prime_p(keys->q, PRS_MR_ITERATIONS));
 
     /* n = p*q */
