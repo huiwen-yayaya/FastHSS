@@ -23,15 +23,14 @@ gmp_randstate_t prng;
 
 void run_benchmark(){
     set_messaging_level(msg_verbose);
-    int i, k;
+    int k;
     int k_len [] = { 96, 112, 128, 256, 512, 1024 };
     prs_keys_t keys;
     prs_ciphertext_t ciphertext;
     prs_plaintext_t plaintext, dec_plaintext;
-    elapsed_time_t time, v1_keys=0, v2_keys=0, enc=0, v1_dec=0, v2_dec=0;
     // generate_keys_v1
 
-    stats_t timing_keys1, timing_keys2, timing_enc, timing_dec1, timing_dec2;
+    stats_t timing_keys1, timing_keys2, timing_enc1, timing_enc2, timing_dec1, timing_dec2;
     printf("Starting benchmark\n");
 
 
@@ -62,12 +61,20 @@ void run_benchmark(){
 
         //prs_enc
         perform_timestamp_sampling_period(
-                timing_enc, sampling_time, max_samples, tu_millis,
+                timing_enc1, sampling_time, max_samples, tu_millis,
                 {
-                    prs_encrypt(ciphertext, keys, plaintext, prng);
+                    prs_encrypt_v1(ciphertext, keys, plaintext, prng);
                 },
                 {});
-        pmesg_stats(msg_verbose, "enc", timing_enc);
+        pmesg_stats(msg_verbose, "enc v1", timing_enc1);
+
+        perform_timestamp_sampling_period(
+                timing_enc2, sampling_time, max_samples, tu_millis,
+                {
+                    prs_encrypt_v2(ciphertext, keys, plaintext, prng, k_len[k]);
+                },
+                {});
+        pmesg_stats(msg_verbose, "enc v2", timing_enc2);
 
 
         //decrypt_v1
@@ -165,12 +172,22 @@ void test_prs_gen_keys_v2(prs_keys_t keys){
  * @param keys prs keys
  * @param plaintext plaintext to encrypt
  */
-void test_prs_enc(prs_ciphertext_t ciphertext, prs_keys_t keys, prs_plaintext_t plaintext){
+void test_prs_enc_v1(prs_ciphertext_t ciphertext, prs_keys_t keys, prs_plaintext_t plaintext){
     elapsed_time_t time;
     printf("Starting prs_encrypt\n");
 
     perform_oneshot_clock_cycles_sampling(time, tu_millis, {
-        prs_encrypt(ciphertext, keys, plaintext, prng);
+        prs_encrypt_v1(ciphertext, keys, plaintext, prng);
+    });
+    printf_et("prs_encrypt - time elapsed: ", time, tu_millis, "\n");
+
+}
+void test_prs_enc_v2(prs_ciphertext_t ciphertext, prs_keys_t keys, prs_plaintext_t plaintext, unsigned int base_size){
+    elapsed_time_t time;
+    printf("Starting prs_encrypt\n");
+
+    perform_oneshot_clock_cycles_sampling(time, tu_millis, {
+        prs_encrypt_v2(ciphertext, keys, plaintext, prng, base_size);
     });
     printf_et("prs_encrypt - time elapsed: ", time, tu_millis, "\n");
 
@@ -225,6 +242,7 @@ int main(int argc, char *argv[]) {
     detect_timestamp_overhead();
 
     //benchmark
+
     run_benchmark();
 
     // test
@@ -239,8 +257,8 @@ int main(int argc, char *argv[]) {
     } while (mpz_sizeinbase(plaintext->m, 2) < keys_v1->k);
 
     // prs_encrypt
-    test_prs_enc(ciphertext_v1, keys_v1, plaintext);
-    test_prs_enc(ciphertext_v2, keys_v2, plaintext);
+    test_prs_enc_v1(ciphertext_v1, keys_v1, plaintext);
+    test_prs_enc_v2(ciphertext_v2, keys_v2, plaintext, 512);
 
     // test decrypt
     gmp_printf("c_v1: %Zd\n\n", ciphertext_v1->c);

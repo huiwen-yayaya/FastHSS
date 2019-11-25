@@ -244,7 +244,7 @@ void prs_generate_keys_v2(prs_keys_t keys, unsigned int k, unsigned int n_bits, 
  * @param plaintext
  * @param prng
  */
-void prs_encrypt(prs_ciphertext_t ciphertext, prs_keys_t keys, prs_plaintext_t plaintext, gmp_randstate_t prng){
+void prs_encrypt_v1(prs_ciphertext_t ciphertext, prs_keys_t keys, prs_plaintext_t plaintext, gmp_randstate_t prng){
     mpz_t x, y_m;
     mpz_inits(x, y_m, NULL);
     mpz_urandomm(x, prng, keys->n);
@@ -254,6 +254,17 @@ void prs_encrypt(prs_ciphertext_t ciphertext, prs_keys_t keys, prs_plaintext_t p
     mpz_mod(ciphertext->c, ciphertext->c, keys->n);
 }
 
+void prs_encrypt_v2(prs_ciphertext_t ciphertext, prs_keys_t keys, prs_plaintext_t plaintext, gmp_randstate_t prng, unsigned int base_size){
+    mpz_t x, y_m;
+    assert(base_size > 0);
+    assert(base_size <= keys->k);
+    mpz_inits(x, y_m, NULL);
+    mpz_urandomb(x, prng, base_size);
+    mpz_powm(y_m, keys->y, plaintext->m, keys->n);
+    mpz_powm(x, x, keys->k_2, keys->n);
+    mpz_mul(ciphertext->c, x, y_m);
+    mpz_mod(ciphertext->c, ciphertext->c, keys->n);
+}
 /**
  * Decrypt(sk, c) Given c ∈ Zn* and the private key sk = {p}, the algorithm first computes
  * d = y ^ -( (p-1) / (2^k) ) mod p

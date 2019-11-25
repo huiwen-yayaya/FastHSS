@@ -46,7 +46,8 @@ void prs_plaintext_clear(prs_plaintext_t plaintext);
 void prs_ciphertext_init(prs_ciphertext_t ciphertext);
 void prs_ciphertext_clear(prs_ciphertext_t ciphertext);
 
-void prs_encrypt(prs_ciphertext_t ciphertext, prs_keys_t keys, prs_plaintext_t plaintext, gmp_randstate_t prng);
+void prs_encrypt_v1(prs_ciphertext_t ciphertext, prs_keys_t keys, prs_plaintext_t plaintext, gmp_randstate_t prng);
+void prs_encrypt_v2(prs_ciphertext_t ciphertext, prs_keys_t keys, prs_plaintext_t plaintext, gmp_randstate_t prng, unsigned int base_size);
 
 void prs_decrypt_v1(prs_plaintext_t plaintext, prs_keys_t keys, prs_ciphertext_t ciphertext);
 void prs_decrypt_v2(prs_plaintext_t plaintext, prs_keys_t keys, prs_ciphertext_t ciphertext);
