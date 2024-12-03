@@ -13,6 +13,8 @@
 #define sampling_time 4 /* secondi */
 #define max_samples (sampling_time * 50)
 
+#define base_size 512
+
 gmp_randstate_t prng;
 
 // Shamir secret sharing: split input into two shares
@@ -33,13 +35,13 @@ void distribute_shares(prs_plaintext_t x, prs_plaintext_t y, prs_plaintext_t z,
     shamir_secret_share(z, z1, z2);
 
     // Homomorphic encryption of shares (using versioned functions)
-    prs_encrypt_v1(enc_x1, keys, x1, prng);
-    prs_encrypt_v1(enc_y1, keys, y1, prng);
-    prs_encrypt_v1(enc_z1, keys, z1, prng);
+    prs_encrypt_v2(enc_x1, keys, x1, prng, base_size);
+    prs_encrypt_v2(enc_y1, keys, y1, prng, base_size);
+    prs_encrypt_v2(enc_z1, keys, z1, prng, base_size);
 
-    prs_encrypt_v1(enc_x2, keys, x2, prng);
-    prs_encrypt_v1(enc_y2, keys, y2, prng);
-    prs_encrypt_v1(enc_z2, keys, z2, prng);
+    prs_encrypt_v2(enc_x2, keys, x2, prng, base_size);
+    prs_encrypt_v2(enc_y2, keys, y2, prng, base_size);
+    prs_encrypt_v2(enc_z2, keys, z2, prng, base_size);
 }
 
 void cipher_eval(prs_plaintext_t a, prs_plaintext_t b, prs_ciphertext_t e, prs_ciphertext_t res, prs_keys_t keys) {
@@ -68,7 +70,7 @@ void plain_eval(prs_plaintext_t a, prs_plaintext_t b, prs_plaintext_t c, prs_cip
 
     prs_ciphertext_t ct;
     prs_ciphertext_init(ct);
-    prs_encrypt_v1(ct, keys, t, prng);
+    prs_encrypt_v2(ct, keys, t, prng, base_size);
 
     mpz_mul(res->c, res->c, ct->c);
     mpz_mod(res->c, res->c, keys->n);
@@ -86,7 +88,7 @@ void client_decrypt_result(prs_plaintext_t dec_res, prs_keys_t keys, prs_ciphert
     mpz_mod(res->c, res->c, keys->n);
 
     // Decrypt the result
-    prs_decrypt_v1(dec_res, keys, res);
+    prs_decrypt_v2(dec_res, keys, res);
 
     // Free intermediate resources
     prs_ciphertext_clear(res);
@@ -149,7 +151,7 @@ elapsed_time_t client_decrypt_with_time(prs_plaintext_t dec_res, prs_keys_t keys
         mpz_mod(res->c, res->c, keys->n);
 
         // Step 2: Decrypt the result and store it in dec_res
-        prs_decrypt_v1(dec_res, keys, res);
+        prs_decrypt_v2(dec_res, keys, res);
 
         // Free intermediate resources
         prs_ciphertext_clear(res);
@@ -199,8 +201,17 @@ int main(int argc, char *argv[]) {
 
     printf("Launching demo with k=%d, n_bits=%d\n\n", DEFAULT_MOD_BITS / 4, DEFAULT_MOD_BITS);
 
+    printf("calibrating timing tools...\n\n");
+    calibrate_clock_cycles_ratio();
+    detect_clock_cycles_overhead();
+    detect_timestamp_overhead(); 
+
     printf("Starting key generation\n");
-    prs_generate_keys_v1(keys, DEFAULT_MOD_BITS / 4, DEFAULT_MOD_BITS, prng);
+    //prs_generate_keys_v2(keys, DEFAULT_MOD_BITS / 4, DEFAULT_MOD_BITS, prng);
+    elapsed_time_t time_generate_keys;
+    perform_oneshot_clock_cycles_sampling(time_generate_keys, tu_millis, {
+        prs_generate_keys_v2(keys, DEFAULT_MOD_BITS / 4, DEFAULT_MOD_BITS, prng);
+    });
     gmp_printf("p: %Zd\n", keys->p);
     gmp_printf("q: %Zd\n", keys->q);
     gmp_printf("n: %Zd\n", keys->n);
@@ -305,7 +316,12 @@ int main(int argc, char *argv[]) {
 
     gmp_printf("Direct Computation Result (x * y * z): %Zd\n\n", expected_result);
 
-    printf_et("HSS time elapsed: ", time_dis_shares + time_s1 + time_s2 + decryption_time, tu_millis, "\n");
+    printf_et("time_generate_keys: ", time_generate_keys, tu_millis, "\n");
+    printf_et("time_dis_shares: ", time_dis_shares, tu_millis, "\n");
+    printf_et("time_s1: ", time_s1, tu_millis, "\n");
+    printf_et("time_s2: ", time_s2, tu_millis, "\n");
+    printf_et("decryption_time: ", decryption_time, tu_millis, "\n");
+    printf_et("HSS time elapsed: ", time_generate_keys + time_dis_shares + time_s1 + time_s2 + decryption_time, tu_millis, "\n");
     printf_et("Direct computation time elapsed: ", computation_time, tu_millis, "\n");
 
     // Verify if the results match
@@ -340,3 +356,4 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
