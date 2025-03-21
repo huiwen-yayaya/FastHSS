@@ -48,6 +48,19 @@ add_executable(
         # lib sources
         src/lib/lib-2k-prs.c)
 
+# xyz
+add_executable(
+        xyz_v1
+        # sources
+        src/xyz/xyz_v1.c
+        # utils
+        src/utils/lib-mesg.c
+        src/utils/lib-timing.c
+        src/utils/lib-misc.c
+
+        # lib sources
+        src/lib/lib-2k-prs.c)
+
 # Linking libraries
 # - GMP
 # - Math
@@ -55,3 +68,4 @@ add_executable(
 target_link_libraries(2k-prs gmp m pbc)
 target_link_libraries(2k-prs-test gmp m pbc)
 target_link_libraries(xyz gmp m pbc)
+target_link_libraries(xyz_v1 gmp m pbc)
